@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { deleteDraft, setStatus, syncInvites } from '../lib/api';
 import { CATEGORY } from '../lib/board';
+import { invitesNote } from '../lib/toast';
 import { dayTitle, relativeDay, todayIso } from '../lib/dates';
 import type { EventRow, TaskRow as Task } from '../lib/types';
 import { TaskRow } from './TaskRow';
@@ -42,7 +43,7 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
     try {
       await setStatus(e.id, s);
       const r = await syncInvites(e.id);
-      setNote('error' in r ? `האירוע עודכן, אך הזימונים לא נשלחו: ${r.error}` : r.sent ? `נשלחו ${r.sent} זימונים/עדכונים ל-Outlook` : null);
+      setNote(invitesNote(r));
       onChanged();
     } catch (err) { setNote((err as Error).message); } finally { setBusy(false); }
   }

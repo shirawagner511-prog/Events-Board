@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { joinWithToken, loadMe, loadReference } from './lib/api';
+import { DEMO, joinWithToken, loadMe, loadReference } from './lib/api';
 import type { Department, Me, Person } from './lib/types';
 import { AppCtx } from './components/ui';
 import { Board } from './screens/Board';
+import { DemoBar } from './components/DemoBar';
+import { Toaster } from './components/Toaster';
 
 type State =
   | { kind: 'loading' }
@@ -38,7 +40,13 @@ export default function App() {
 
   if (state.kind === 'loading') return <div className="grid h-full place-items-center text-muted">טוען…</div>;
   if (state.kind === 'guest') return <Welcome error={state.error} />;
-  return <AppCtx.Provider value={ctx!}><Board /></AppCtx.Provider>;
+  return (
+    <AppCtx.Provider value={ctx!}>
+      {DEMO && <DemoBar />}
+      <Board />
+      <Toaster />
+    </AppCtx.Provider>
+  );
 }
 
 export function Welcome({ error }: { error?: string }) {

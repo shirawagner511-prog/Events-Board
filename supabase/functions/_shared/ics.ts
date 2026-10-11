@@ -110,7 +110,12 @@ export function buildIcs(c: InviteContent, o: IcsOptions): string {
 
 /** Stable hash of what the attendee sees, so unchanged events are not re-sent. */
 export async function fingerprint(c: InviteContent): Promise<string> {
-  const data = new TextEncoder().encode(JSON.stringify([c.summary, c.location, c.description, c.start.toISOString(), c.end.toISOString()]));
-  const digest = await crypto.subtle.digest('SHA-256', data);
+  const text = JSON.stringify([c.summary, c.location, c.description, c.start.toISOString(), c.end.toISOString()]);
+  if (!globalThis.crypto?.subtle) { // insecure browser context (demo over plain http on the LAN)
+    let h = 5381;
+    for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+    return `djb2-${h.toString(16)}-${text.length}`;
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }

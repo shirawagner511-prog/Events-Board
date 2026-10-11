@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "demo": "vite --mode demo --host",
     "build": "tsc -b --noEmit && vite build",
+    "build:demo": "vite build --mode demo",
     "preview": "vite preview",
     "db:reset": "node scripts/db-reset.mjs",
     "test:db": "node --test --test-concurrency=1 tests/*.test.mjs",

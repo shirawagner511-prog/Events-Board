@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseMessage, saveEvent, setStatus, syncInvites } from '../lib/api';
 import { CATEGORY } from '../lib/board';
+import { invitesNote, toast } from '../lib/toast';
 import { hhmm, todayIso } from '../lib/dates';
 import type { EventDraft, EventRow, TaskRow } from '../lib/types';
 import { Btn, Sheet, useApp } from '../components/ui';
@@ -60,7 +61,10 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
     try {
       const id = await saveEvent(d);
       if (publish && status !== 'published') await setStatus(id, 'published');
-      if (publish || status === 'published') await syncInvites(id);
+      if (publish || status === 'published') {
+        const note = invitesNote(await syncInvites(id));
+        if (note) toast(note);
+      }
       onSaved(id);
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   }

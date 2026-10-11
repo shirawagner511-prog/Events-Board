@@ -1,7 +1,6 @@
 // Loads the visible date range and keeps it live: any change by anyone triggers a refetch.
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { supabase } from './supabase';
-import { loadRange } from './api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { loadRange, subscribe } from './api';
 import type { EventRow, TaskRow } from './types';
 
 export function useBoard(from: string, to: string) {
@@ -9,7 +8,6 @@ export function useBoard(from: string, to: string) {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const channelId = useId();
   const range = useRef({ from, to });
   range.current = { from, to };
 
@@ -33,15 +31,11 @@ export function useBoard(from: string, to: string) {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const soon = () => { clearTimeout(timer); timer = setTimeout(refresh, 250); };
-    const channel = supabase
-      .channel(`board-${channelId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, soon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_tasks' }, soon)
-      .subscribe();
+    const unsubscribe = subscribe(soon);
     const onFocus = () => document.visibilityState === 'visible' && refresh();
     document.addEventListener('visibilitychange', onFocus);
-    return () => { clearTimeout(timer); supabase.removeChannel(channel); document.removeEventListener('visibilitychange', onFocus); };
-  }, [refresh, channelId]);
+    return () => { clearTimeout(timer); unsubscribe(); document.removeEventListener('visibilitychange', onFocus); };
+  }, [refresh]);
 
   const tasksByEvent = useMemo(() => {
     const m = new Map<string, TaskRow[]>();
