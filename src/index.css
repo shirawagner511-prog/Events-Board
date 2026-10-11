@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f6f5fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #eeecf7;
+  --color-line: #e3e0ee;
+  --color-primary: #5b4bdb;
+  --color-primary-dark: #4536b8;
+  --color-primary-soft: #e9e6fc;
+  --color-ink: #23203a;
+  --color-muted: #7c7896;
+  --color-success: #1f9d68;
+  --color-success-soft: #dcf3e8;
+  --color-warning: #c27c0e;
+  --color-warning-soft: #fdf0d5;
+  --color-danger: #d9443f;
+  --color-danger-soft: #fde4e3;
+  --font-sans: 'Heebo', system-ui, -apple-system, sans-serif;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  direction: rtl;
+  text-align: right;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Times and numbers stay left-to-right inside Hebrew text */
+.ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; font-feature-settings: 'tnum' 1; }
+.pb-safe { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+input, textarea, select { font: inherit; }
+@keyframes sheetIn { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.sheet-in { animation: sheetIn .22s ease-out both; }
