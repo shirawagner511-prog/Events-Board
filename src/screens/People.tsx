@@ -1,3 +1,4 @@
+import { ask } from '../components/Confirm';
 import { useCallback, useEffect, useState } from 'react';
 import { loadAdminPeople, personalLink, resetLink, savePerson, setActive } from '../lib/api';
 import type { AdminPerson } from '../lib/types';
@@ -17,12 +18,10 @@ export function People({ onClose }: { onClose: () => void }) {
   async function copy(token: string, name: string) {
     const link = personalLink(token);
     try { await navigator.clipboard.writeText(link); setMsg(`הקישור של ${name} הועתק - שלחי לו/לה בוואטסאפ`); }
-    catch { prompt('העתיקי את הקישור:', link); }
+    catch { setMsg(`העתיקי ידנית: ${link}`); }
   }
-  function share(token: string, name: string) {
-    const text = `היי ${name}, זה הקישור האישי שלך ללוח האירועים. פתח/י אותו פעם אחת בטלפון והוסיפ/י למסך הבית: ${personalLink(token)}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  }
+  const waLink = (token: string, name: string) =>
+    `https://wa.me/?text=${encodeURIComponent(`היי ${name}, זה הקישור האישי שלך ללוח האירועים. פתח/י אותו פעם אחת בטלפון והוסיפ/י למסך הבית: ${personalLink(token)}`)}`;
   async function save() {
     if (!edit?.name.trim()) return;
     try { await savePerson({ ...edit }); setEdit(null); await load(); } catch (e) { setMsg((e as Error).message); }
@@ -47,9 +46,9 @@ export function People({ onClose }: { onClose: () => void }) {
             </div>
             {p.active && (
               <div className="mt-2 flex flex-wrap gap-2">
-                <Btn kind="soft" onClick={() => share(p.link_token, p.name)}>שליחה בוואטסאפ</Btn>
+                <a href={waLink(p.link_token, p.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-dark">שליחה בוואטסאפ</a>
                 <Btn kind="ghost" onClick={() => copy(p.link_token, p.name)}>העתקת קישור</Btn>
-                <Btn kind="ghost" onClick={async () => { if (confirm(`לנתק את ${p.name} מכל המכשירים וליצור קישור חדש?`)) { await resetLink(p.id); await load(); } }}>קישור חדש</Btn>
+                <Btn kind="ghost" onClick={async () => { if (await ask(`לנתק את ${p.name} מכל המכשירים וליצור קישור חדש?`, { ok: 'קישור חדש' })) { await resetLink(p.id); await load(); } }}>קישור חדש</Btn>
                 {p.id !== me.id && <Btn kind="ghost" onClick={async () => { await setActive(p.id, false); await load(); }}>השבתה</Btn>}
               </div>
             )}

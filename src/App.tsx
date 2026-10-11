@@ -1,3 +1,4 @@
+import { ConfirmHost } from './components/Confirm';
 import { useEffect, useMemo, useState } from 'react';
 import { DEMO, joinWithToken, loadMe, loadReference } from './lib/api';
 import type { Department, Me, Person } from './lib/types';
@@ -45,6 +46,7 @@ export default function App() {
       {DEMO && <DemoBar />}
       <Board />
       <Toaster />
+      <ConfirmHost />
     </AppCtx.Provider>
   );
 }

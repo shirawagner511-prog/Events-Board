@@ -1,3 +1,4 @@
+import { ask } from '../components/Confirm';
 import { useEffect, useMemo, useState } from 'react';
 import { loadEvent, loadPending, loadRequests, signOut } from '../lib/api';
 import { isMine, isMyTask, needsAttention } from '../lib/board';
@@ -92,7 +93,7 @@ export function Board() {
               <button onClick={() => setPanel('people')} aria-label="אנשים" className="rounded-xl bg-surface-2 px-3 py-2 text-sm">👥</button>
             </>
           )}
-          <button onClick={() => { if (confirm('להתנתק מהמכשיר הזה?')) signOut().then(() => location.reload()); }} aria-label="התנתקות" title="התנתקות" className="rounded-xl px-2 py-2 text-sm text-muted">🚪</button>
+          <button onClick={async () => { if (await ask('להתנתק מהמכשיר הזה?', { ok: 'התנתקות' })) signOut().then(() => location.reload()); }} aria-label="התנתקות" title="התנתקות" className="rounded-xl px-2 py-2 text-sm text-muted">🚪</button>
         </div>
 
         <div className="flex items-center gap-2 px-3 py-2">

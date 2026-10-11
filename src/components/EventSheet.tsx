@@ -1,3 +1,4 @@
+import { ask } from './Confirm';
 import { useState } from 'react';
 import { deleteDraft, setStatus, syncInvites } from '../lib/api';
 import { CATEGORY } from '../lib/board';
@@ -38,7 +39,7 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
   const others = tasks.filter(t => !me.departments.includes(t.department_id));
 
   async function changeStatus(s: EventRow['status']) {
-    if (s === 'cancelled' && !confirm('לבטל את האירוע? כל מי שקיבל זימון יקבל ביטול.')) return;
+    if (s === 'cancelled' && !(await ask('לבטל את האירוע? כל מי שקיבל זימון יקבל ביטול.', { ok: 'ביטול האירוע', danger: true }))) return;
     setBusy(true); setNote(null);
     try {
       await setStatus(e.id, s);
@@ -49,7 +50,7 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
   }
 
   async function remove() {
-    if (!confirm('למחוק את הטיוטה?')) return;
+    if (!(await ask('למחוק את הטיוטה?', { ok: 'מחיקה', danger: true }))) return;
     await deleteDraft(e.id); onChanged(); onClose();
   }
 
