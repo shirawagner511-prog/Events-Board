@@ -124,3 +124,13 @@ test('monday form can become a new draft', async () => {
 test('non-admins cannot see monday requests', async () => {
   assert.equal((await asUser(liel.uid, run => run(`select * from monday_requests`))).length, 0);
 });
+
+test('paid operations staff is saved, cleared with 0, and counts as a content change', async () => {
+  const id = await saveEvent(yahli.uid, { title: 'בחירות', event_date: '2026-10-25', paid_staff: '2' });
+  const [a] = await q(`select paid_staff, content_updated_at from events where id = $1`, [id]);
+  assert.equal(a.paid_staff, 2);
+  await saveEvent(yahli.uid, { id, title: 'בחירות', event_date: '2026-10-25', paid_staff: '0' });
+  const [b] = await q(`select paid_staff, content_updated_at from events where id = $1`, [id]);
+  assert.equal(b.paid_staff, null);
+  assert.ok(b.content_updated_at > a.content_updated_at);
+});

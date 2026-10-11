@@ -93,7 +93,7 @@ export async function markTask(taskId: string, action: 'seen' | 'done' | 'undo')
 
 // ------------------------------------------------------------ admin: events
 
-const CONTENT: (keyof EventRow)[] = ['title', 'event_date', 'start_time', 'end_time', 'prep_time', 'location', 'guests', 'menu', 'lead', 'teardown', 'suppliers', 'notes', 'status', 'tentative'];
+const CONTENT: (keyof EventRow)[] = ['title', 'event_date', 'start_time', 'end_time', 'prep_time', 'location', 'guests', 'menu', 'lead', 'teardown', 'suppliers', 'paid_staff', 'notes', 'status', 'tentative'];
 
 function touch(e: EventRow, patch: Partial<EventRow>) {
   const changed = CONTENT.some(k => k in patch && patch[k] !== e[k]);
@@ -109,7 +109,7 @@ export async function saveEvent(d: EventDraft): Promise<string> {
     e = {
       id: id(), status: 'pending', tentative: false, category: 'events', title: d.title, event_date: d.event_date,
       start_time: null, end_time: null, prep_time: null, location: null, guests: null, menu: null, requester: null, lead: null,
-      teardown: null, suppliers: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
+      teardown: null, suppliers: null, paid_staff: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
       content_updated_at: nowIso(), published_at: null, updated_at: nowIso(),
     };
     db().events.push(e);
@@ -117,7 +117,7 @@ export async function saveEvent(d: EventDraft): Promise<string> {
   touch(e, {
     title: d.title, event_date: d.event_date, start_time: nil(d.start_time), end_time: nil(d.end_time), prep_time: nil(d.prep_time),
     location: nil(d.location), guests: nil(d.guests) === null ? null : Number(d.guests), menu: nil(d.menu), requester: nil(d.requester),
-    lead: nil(d.lead), teardown: nil(d.teardown), suppliers: nil(d.suppliers), notes: nil(d.notes), category: d.category,
+    lead: nil(d.lead), teardown: nil(d.teardown), suppliers: nil(d.suppliers), paid_staff: +d.paid_staff > 0 ? +d.paid_staff : null, notes: nil(d.notes), category: d.category,
     tentative: d.tentative, monday_dirty: false,
   });
   const keep = new Set<string>();
@@ -190,6 +190,7 @@ export async function parseMessage(text: string): Promise<Partial<EventDraft> & 
   const wd = days.findIndex(d => new RegExp(`(ביום|יום)\\s+${d}`).test(text));
   if (!date && wd >= 0) { let d = addDays(startOfWeek(today), wd); if (d <= today) d = addDays(d, 7); date = d; }
   const times = [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m => `${m[1].padStart(2, '0')}:${m[2]}`);
+  const paid = text.match(/(\d+)\s*(?:עובדי|עובד)\s*(?:תפעול\s*)?בתשלום/)?.[1] ?? (/בתשלום/.test(text) ? '1' : '');
   const guests = text.match(/(\d+)\s*(איש|אנשים|משתתפים|אורחים|עובדים)/)?.[1] ?? '';
   const place = text.match(/(?:ב|מיקום:?\s*)(מועדון|מרפסת[^,.\n]*|חדר[^,.\n]*|קומה[^,.\n]*|רחבת[^,.\n]*)/)?.[1]?.trim() ?? '';
   const tasks: EventDraft['tasks'] = [];
@@ -199,7 +200,7 @@ export async function parseMessage(text: string): Promise<Partial<EventDraft> & 
   const firstLine = text.trim().split('\n')[0].replace(/^(היי|הי|שלום)[^,]*,\s*/, '')
     .split(/\s(?:מחרתיים|מחר|היום|ביום|ב-?\d|\d{1,2}[:./]|\d+\s*איש)/)[0].replace(/[,.]\s*$/, '');
   return {
-    title: firstLine.slice(0, 50), event_date: date, start_time: times[0] ?? '', end_time: times[1] ?? '', guests, location: place, tasks,
+    title: firstLine.slice(0, 50), event_date: date, start_time: times[0] ?? '', end_time: times[1] ?? '', guests, location: place, paid_staff: paid, tasks,
     uncertain: ['במצב דמו הפענוח בסיסי (תאריך, שעה, כמות, מקום). בגרסה האמיתית Claude קורא את כל ההודעה וממלא גם תפריט, מוציא ומשימות מדויקות'],
   };
 }
@@ -239,7 +240,7 @@ export async function createFromRequest(item: string): Promise<string> {
   db().events.push({
     id: eid, status: 'pending', tentative: false, category: 'events', title: f.title, event_date: f.event_date, start_time: f.start_time,
     end_time: null, prep_time: null, location: f.location, guests: f.guests, menu: f.menu, requester: f.requester, lead: null, teardown: null,
-    suppliers: null, notes: f.notes, source: 'monday', monday_item_id: item, monday_dirty: false, content_updated_at: nowIso(),
+    suppliers: null, paid_staff: null, notes: f.notes, source: 'monday', monday_item_id: item, monday_dirty: false, content_updated_at: nowIso(),
     published_at: null, updated_at: nowIso(),
   });
   Object.assign(r, { status: 'linked', event_id: eid });

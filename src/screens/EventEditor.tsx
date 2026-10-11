@@ -9,7 +9,7 @@ import { Btn, Sheet, useApp } from '../components/ui';
 export function emptyDraft(date = todayIso()): EventDraft {
   return {
     title: '', event_date: date, start_time: '', end_time: '', prep_time: '', location: '', guests: '', menu: '',
-    requester: '', lead: '', teardown: '', suppliers: '', notes: '', category: 'events', tentative: false, tasks: [],
+    requester: '', lead: '', teardown: '', suppliers: '', paid_staff: '', notes: '', category: 'events', tentative: false, tasks: [],
   };
 }
 
@@ -19,7 +19,7 @@ export function draftFrom(e: EventRow, tasks: TaskRow[], copy = false): EventDra
     id: copy ? undefined : e.id,
     title: e.title, event_date: e.event_date, start_time: hhmm(e.start_time), end_time: hhmm(e.end_time),
     prep_time: hhmm(e.prep_time), location: s(e.location), guests: s(e.guests), menu: s(e.menu),
-    requester: s(e.requester), lead: s(e.lead), teardown: s(e.teardown), suppliers: s(e.suppliers), notes: s(e.notes),
+    requester: s(e.requester), lead: s(e.lead), teardown: s(e.teardown), suppliers: s(e.suppliers), paid_staff: s(e.paid_staff), notes: s(e.notes),
     category: e.category, tentative: e.tentative,
     tasks: tasks.map(t => ({ id: copy ? undefined : t.id, department_id: t.department_id, description: t.description })),
   };
@@ -104,6 +104,25 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
           <F label="ספקי חוץ"><input className={input} {...text('suppliers')} /></F>
           <F label="מזמין"><input className={input} {...text('requester')} /></F>
           <F label="הערות מיוחדות" wide><textarea rows={2} className={input} {...text('notes')} /></F>
+        </div>
+
+        <div className="rounded-xl border border-line p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input id="paid-staff-toggle" type="checkbox" className="h-4 w-4 accent-primary" checked={+d.paid_staff > 0}
+              onChange={e => set('paid_staff')(e.target.checked ? '1' : '')} />
+            לקחתי עובד תפעול בתשלום
+          </label>
+          {+d.paid_staff > 0 && (
+            <div className="mt-2 flex items-center gap-3">
+              <span className="text-sm text-muted">כמה עובדים?</span>
+              <div className="flex items-center rounded-xl border border-line">
+                <button type="button" aria-label="פחות" className="h-10 w-10 text-lg" onClick={() => set('paid_staff')(String(Math.max(1, +d.paid_staff - 1)))}>−</button>
+                <input id="paid-staff-count" inputMode="numeric" className="w-12 bg-transparent text-center text-lg font-bold outline-none" value={d.paid_staff}
+                  onChange={e => set('paid_staff')(e.target.value.replace(/\D/g, ''))} />
+                <button type="button" aria-label="יותר" className="h-10 w-10 text-lg" onClick={() => set('paid_staff')(String(+d.paid_staff + 1))}>+</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>

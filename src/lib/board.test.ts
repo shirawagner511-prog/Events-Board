@@ -5,7 +5,7 @@ import type { EventRow, Me, TaskRow } from './types';
 const ev = (p: Partial<EventRow>): EventRow => ({
   id: 'e', status: 'published', tentative: false, category: 'events', title: 't', event_date: '2026-10-12',
   start_time: null, end_time: null, prep_time: null, location: null, guests: null, menu: null, requester: null,
-  lead: null, teardown: null, suppliers: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
+  lead: null, teardown: null, suppliers: null, paid_staff: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
   content_updated_at: '2026-10-10T10:00:00Z', published_at: null, updated_at: '', ...p,
 });
 const task = (p: Partial<TaskRow>): TaskRow => ({

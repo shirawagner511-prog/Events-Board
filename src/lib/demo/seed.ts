@@ -22,7 +22,7 @@ export interface DemoDb {
   mondayPool: number;
 }
 
-export const DEMO_VERSION = 1;
+export const DEMO_VERSION = 2;
 
 export function seed(): DemoDb {
   const now = new Date().toISOString();
@@ -56,7 +56,7 @@ export function seed(): DemoDb {
     const e: EventRow = {
       id: `ev${++n}`, status: 'published', tentative: false, category: 'events', title, event_date: d,
       start_time: null, end_time: null, prep_time: null, location: null, guests: null, menu: null, requester: null,
-      lead: null, teardown: null, suppliers: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
+      lead: null, teardown: null, suppliers: null, paid_staff: null, notes: null, source: 'manual', monday_item_id: null, monday_dirty: false,
       content_updated_at: earlier, published_at: earlier, updated_at: earlier, ...o,
     };
     events.push(e);
@@ -96,7 +96,7 @@ export function seed(): DemoDb {
   const dolly = E(day(3), 'אירוע דולי בייקרי - נשנושים בריאים', { start_time: '10:00', location: 'מועדון', category: 'cafe', menu: 'שתייה ואוכל מהמטבח המרכזי' });
   T(dolly, 'mk', 'למלא שתייה במועדון');
   T(dolly, 'ops', 'לתגבר את שירה בארוחת בוקר במידת הצורך');
-  const italian = E(day(3), 'אירוע מילואמניקים איטלקי - רווחה', { start_time: '16:00', prep_time: '15:30', location: 'מועדון', guests: 120, menu: 'אוכל - מטבח שגב, תפריט אצל שגיא', lead: 'יהלי, שירה, ענבר (בתשלום)', category: 'welfare' });
+  const italian = E(day(3), 'אירוע מילואמניקים איטלקי - רווחה', { start_time: '16:00', prep_time: '15:30', location: 'מועדון', guests: 120, menu: 'אוכל - מטבח שגב, תפריט אצל שגיא', lead: 'יהלי, שירה, ענבר', paid_staff: 1, category: 'welfare' });
   T(italian, 'mk', 'למלא שתייה במועדון');
   T(italian, 'kitchen', 'תפריט בנוי לאירוע');
   T(italian, 'ops', 'הוצאת אירוע ביחד עם יהלי');
@@ -117,7 +117,7 @@ export function seed(): DemoDb {
   T(women, 'mk', 'לשים לב לשתייה במועדון ופינויים יום אחרי במידת הצורך');
   T(women, 'ops', 'הוצאת אירוע ביחד עם יהלי');
   T(women, 'kitchen', 'ארגון האוכל בסקן בוקס');
-  const hhElections = E(day(14), 'HAPPY HOUR בחירות', { start_time: '13:00', prep_time: '11:00', location: 'רחבת הקפה ובחוץ', menu: 'פנים: דוכן יין/בירה, דוכן בורקס\nבחוץ: דוכן פיצה טאבון, דוכן קרפים', lead: 'יהלי, שירה (ראנרים)', suppliers: 'ברמנים בתשלום' });
+  const hhElections = E(day(14), 'HAPPY HOUR בחירות', { start_time: '13:00', prep_time: '11:00', location: 'רחבת הקפה ובחוץ', menu: 'פנים: דוכן יין/בירה, דוכן בורקס\nבחוץ: דוכן פיצה טאבון, דוכן קרפים', lead: 'יהלי, שירה (ראנרים)', paid_staff: 2 });
   T(hhElections, 'cafe', '3 ברמנים לצורך האירוע, 2 בתשלום - הקמה, תפעול ופינוי');
   T(hhElections, 'kitchen', 'תפעול דוכן פיצה (שגיא + ליאל)');
   T(hhElections, 'mk', 'עזרה בהקמה - ליאל באירוע, עזרה בפינוי');

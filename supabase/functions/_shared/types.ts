@@ -19,6 +19,7 @@ export interface EventRow {
   lead: string | null;
   teardown: string | null;
   suppliers: string | null;
+  paid_staff: number | null;   // paid operations workers hired for the event
   notes: string | null;
   source: 'manual' | 'monday';
   monday_item_id: string | null;

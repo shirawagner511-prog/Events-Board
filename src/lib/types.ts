@@ -40,6 +40,7 @@ export interface EventDraft {
   lead: string;
   teardown: string;
   suppliers: string;
+  paid_staff: string;
   notes: string;
   category: import('../../supabase/functions/_shared/types.ts').Category;
   tentative: boolean;

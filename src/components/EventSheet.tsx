@@ -8,11 +8,10 @@ import type { EventRow, TaskRow as Task } from '../lib/types';
 import { TaskRow } from './TaskRow';
 import { Btn, Sheet, Time, useApp } from './ui';
 
-function Fact({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   if (children === null || children === undefined || children === '') return null;
   return (
     <div className="flex gap-3 py-1.5">
-      <span className="w-6 text-center text-lg" aria-hidden>{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="text-xs text-muted">{label}</div>
         <div className="whitespace-pre-line text-[15px] leading-snug">{children}</div>
@@ -79,14 +78,15 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
         </div>
 
         <div className="divide-y divide-line rounded-xl border border-line px-3">
-          <Fact icon="📍" label="מקום">{e.location}</Fact>
-          <Fact icon="👥" label="כמות אנשים">{e.guests}</Fact>
-          <Fact icon="🍽️" label="תפריט">{e.menu}</Fact>
-          <Fact icon="🚀" label="מוציא">{e.lead}</Fact>
-          <Fact icon="📦" label="מקפל">{e.teardown}</Fact>
-          <Fact icon="🚚" label="ספקי חוץ">{e.suppliers}</Fact>
-          <Fact icon="⚠️" label="הערות מיוחדות">{e.notes}</Fact>
-          <Fact icon="🙋" label="מזמין">{e.requester}</Fact>
+          <Fact label="מקום">{e.location}</Fact>
+          <Fact label="כמות אנשים">{e.guests}</Fact>
+          <Fact label="תפריט">{e.menu}</Fact>
+          <Fact label="מוציא">{e.lead}</Fact>
+          <Fact label="מקפל">{e.teardown}</Fact>
+          <Fact label="ספקי חוץ">{e.suppliers}</Fact>
+          <Fact label="עובדי תפעול בתשלום">{e.paid_staff ? `${e.paid_staff} ${e.paid_staff === 1 ? 'עובד' : 'עובדים'}` : null}</Fact>
+          <Fact label="הערות מיוחדות">{e.notes}</Fact>
+          <Fact label="מזמין">{e.requester}</Fact>
         </div>
 
         {mine.length > 0 && (

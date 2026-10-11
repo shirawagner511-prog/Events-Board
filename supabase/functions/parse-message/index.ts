@@ -18,6 +18,7 @@ const Draft = z.object({
   lead: z.string().nullable().describe('who runs the event on site (מוציא)'),
   teardown: z.string().nullable().describe('who clears up (מקפל)'),
   suppliers: z.string().nullable().describe('external suppliers'),
+  paid_staff: z.number().int().nullable().describe('number of paid operations workers hired for the event, if mentioned'),
   notes: z.string().nullable(),
   tasks: z.array(z.object({
     department_id: z.enum(['events', 'kitchen', 'mk', 'cafe', 'ops', 'site']),

@@ -39,6 +39,7 @@ export function buildInviteContent(e: EventRow, myTasks: Pick<TaskRow, 'descript
   add('מוציא', e.lead);
   add('מקפל', e.teardown);
   add('ספקי חוץ', e.suppliers);
+  add('עובדי תפעול בתשלום', e.paid_staff);
   if (e.menu) lines.push('', 'תפריט:', e.menu);
   if (e.notes) lines.push('', 'הערות:', e.notes);
   lines.push('', `לפרטים ואישור: ${appUrl}/?event=${e.id}`);

@@ -23,9 +23,10 @@ export function EventCard({ event: e, tasks, close, onOpen }: { event: EventRow;
             {myOpen.length > 0 && <span className="rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">דורש אישור שלך</span>}
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-3 text-[13px] text-muted">
-            {e.location && <span>📍 {e.location}</span>}
-            {e.guests != null && <span>👥 {e.guests}</span>}
-            {e.lead && <span>🚀 {e.lead}</span>}
+            {e.location && <span>{e.location}</span>}
+            {e.guests != null && <span>{e.guests} איש</span>}
+            {e.lead && <span>מוציא: {e.lead}</span>}
+            {!!e.paid_staff && <span className="font-semibold text-warning">{e.paid_staff} בתשלום</span>}
           </div>
           {tasks.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">

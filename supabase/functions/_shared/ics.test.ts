@@ -5,7 +5,7 @@ export const baseEvent: EventRow = {
   id: 'e1', status: 'published', tentative: false, category: 'events', title: 'האפי אוור בחירות',
   event_date: '2026-10-25', start_time: '13:00:00', end_time: null, prep_time: '11:30:00',
   location: 'רחבת הקפה', guests: 200, menu: 'פיצה טאבון\nקרפים', requester: 'HR', lead: 'יהלי',
-  teardown: 'ליאל', suppliers: null, notes: 'ברמן מגיע 11:00', source: 'manual', monday_item_id: null,
+  teardown: 'ליאל', suppliers: null, paid_staff: 2, notes: 'ברמן מגיע 11:00', source: 'manual', monday_item_id: null,
   monday_dirty: false, content_updated_at: '', published_at: '', updated_at: '',
 };
 

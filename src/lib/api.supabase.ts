@@ -93,7 +93,7 @@ export async function parseMessage(text: string): Promise<Partial<EventDraft> & 
   return {
     title: s(d.title), event_date: s(d.event_date), start_time: s(d.start_time), end_time: s(d.end_time),
     prep_time: s(d.prep_time), location: s(d.location), guests: s(d.guests), menu: s(d.menu),
-    requester: s(d.requester), lead: s(d.lead), teardown: s(d.teardown), suppliers: s(d.suppliers),
+    requester: s(d.requester), lead: s(d.lead), teardown: s(d.teardown), suppliers: s(d.suppliers), paid_staff: s(d.paid_staff),
     notes: s(d.notes), tasks: d.tasks ?? [], uncertain: d.uncertain ?? [],
   };
 }
