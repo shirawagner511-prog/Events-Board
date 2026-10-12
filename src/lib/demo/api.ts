@@ -16,11 +16,35 @@ function db(): DemoDb {
   try {
     const raw = localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as DemoDb) : null;
-    memory = parsed?.version === DEMO_VERSION ? parsed : seed();
+    memory = !parsed ? seed() : parsed.version === DEMO_VERSION ? parsed : upgrade(parsed);
   } catch {
     memory = seed();
   }
   return memory;
+}
+
+/**
+ * Brings data saved by an older demo build up to date without losing what the person entered:
+ * new fields get defaults, departments take their current names and colours.
+ */
+function upgrade(old: Partial<DemoDb>): DemoDb {
+  const fresh = seed();
+  if (!Array.isArray(old.events) || !Array.isArray(old.people)) return fresh;
+  const upgraded: DemoDb = {
+    ...fresh,
+    ...old,
+    version: DEMO_VERSION,
+    departments: fresh.departments,
+    events: old.events.map(e => ({ ...e, paid_staff: e.paid_staff ?? null })),
+    tasks: old.tasks ?? [],
+    files: old.files ?? [],
+    requests: old.requests ?? [],
+    inviteLog: old.inviteLog ?? [],
+    memberships: old.memberships ?? fresh.memberships,
+    mondayPool: old.mondayPool ?? 0,
+  } as DemoDb;
+  try { localStorage.setItem(KEY, JSON.stringify(upgraded)); } catch { /* keep in memory */ }
+  return upgraded;
 }
 
 function commit() {

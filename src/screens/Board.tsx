@@ -119,7 +119,7 @@ export function Board() {
   const chips: { id: Scope; label: string; color?: string }[] = [
     { id: 'all', label: 'הכל' },
     ...(me.departments.length ? [{ id: 'mine', label: 'שלי' }] : []),
-    ...departments.filter(d => d.id !== 'site').map(d => ({ id: d.id, label: d.name, color: d.color })),
+    ...departments.filter(d => d.id !== 'site' && d.id !== 'events').map(d => ({ id: d.id, label: d.name, color: d.color })),
   ];
 
   return (
@@ -152,7 +152,7 @@ export function Board() {
 
         <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">
-            <span className="shrink-0 text-[14px] text-muted">אני מ:</span>
+            <span className="shrink-0 text-[14px] text-muted">הצגה:</span>
             {chips.map(c => (
               <button key={c.id} onClick={() => setScope(c.id)}
                 className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[14px] font-semibold ${scope === c.id ? 'border-control bg-control text-control-ink' : 'border-line bg-surface hover:bg-surface-2'}`}>
@@ -161,7 +161,6 @@ export function Board() {
               </button>
             ))}
           </div>
-          <div className="max-md:hidden"><Legend /></div>
         </div>
       </header>
 
@@ -191,11 +190,12 @@ export function Board() {
         {scope !== 'all' && !visible.length && !board.loading && (
           <p className="px-6 text-center text-sm text-muted">מסונן לפי "{chips.find(c => c.id === scope)?.label}". <button className="font-bold text-primary" onClick={() => setScope('all')}>להצגת הכל</button></p>
         )}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3 px-4 text-[14px] text-muted">
+        <div className="mt-8 flex justify-center px-4"><Legend /></div>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3 px-4 text-[14px] text-muted">
           <button onClick={() => setPrint({ title: `${printTitle}${scopeName}`, events: visible, tasksByEvent: board.tasksByEvent })} className={ctl}>הדפסה / PDF</button>
           {me.is_admin && <button onClick={() => setPanel('people')} className={ctl}>אנשים והרשאות</button>}
           <button onClick={async () => { if (await ask('להתנתק מהמכשיר הזה?', { ok: 'התנתקות' })) signOut().then(() => location.reload()); }} className={ctl}>התנתקות</button>
-          <span className="md:hidden"><Legend /></span>
+
         </div>
       </main>
 
