@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { parseMessage, saveEvent, setStatus, syncInvites } from '../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { deleteFile, listFiles, parseMessage, saveEvent, setStatus, syncInvites, uploadFile } from '../lib/api';
+import { fileKind, fileSize } from '../components/Files';
 import { CATEGORY } from '../lib/board';
 import { invitesNote, toast } from '../lib/toast';
 import { hhmm, todayIso } from '../lib/dates';
-import type { EventDraft, EventRow, TaskRow } from '../lib/types';
+import type { EventDraft, EventFile, EventRow, TaskRow } from '../lib/types';
+import { MAX_FILE_MB } from '../lib/types';
 import { Btn, Sheet, useApp } from '../components/ui';
 
 export function emptyDraft(date = todayIso()): EventDraft {
@@ -40,6 +42,11 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
   const [err, setErr] = useState<string | null>(null);
   const [paste, setPaste] = useState<string | null>(initial.id ? null : '');
   const [uncertain, setUncertain] = useState<string[]>([]);
+  const [files, setFiles] = useState<EventFile[]>([]);
+  const [removed, setRemoved] = useState<EventFile[]>([]);
+  const [added, setAdded] = useState<File[]>([]);
+  const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (initial.id) listFiles(initial.id).then(setFiles).catch(() => {}); }, [initial.id]);
   const set = <K extends keyof EventDraft>(k: K) => (v: EventDraft[K]) => setD(x => ({ ...x, [k]: v }));
   const text = (k: keyof EventDraft) => ({ value: d[k] as string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(k)(e.target.value as never) });
 
@@ -60,6 +67,8 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
     setBusy(true); setErr(null);
     try {
       const id = await saveEvent(d);
+      for (const f of removed) await deleteFile(f);
+      for (const f of added) await uploadFile(id, f);
       if (publish && status !== 'published') await setStatus(id, 'published');
       if (publish || status === 'published') {
         const note = invitesNote(await syncInvites(id));
@@ -78,7 +87,7 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
       <div className="space-y-5 p-4 pb-28">
         {paste !== null && (
           <div className="rounded-2xl border border-primary/30 bg-primary-soft/50 p-3">
-            <p className="mb-2 text-sm font-semibold">✨ הדביקי הודעה מוואטסאפ או מייל ואמלא את הפרטים</p>
+            <p className="mb-2 text-sm font-semibold">הדביקי הודעה מוואטסאפ או מייל ואמלא את הפרטים</p>
             <textarea className={`${input} min-h-28`} placeholder="לדוגמה: היי יהלי, ביום שלישי ב-16:00 הרמת כוסית לצוות R&D, 60 איש, מרפסת קומה 5…" value={paste} onChange={e => setPaste(e.target.value)} />
             <div className="mt-2 flex gap-2">
               <Btn disabled={busy || !paste.trim()} onClick={fromMessage}>{busy ? 'קורא…' : 'מילוי אוטומטי'}</Btn>
@@ -170,6 +179,40 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
           </div>
         </div>
 
+        <div>
+          <h3 className="mb-2 text-sm font-bold">קבצים מצורפים</h3>
+          <div className="flex flex-col gap-2">
+            {files.filter(f => !removed.some(r => r.id === f.id)).map(f => (
+              <div key={f.id} className="flex items-center gap-3 rounded-xl border border-line px-3 py-2">
+                <span className="grid h-8 w-10 shrink-0 place-items-center rounded-md bg-primary-soft text-[10px] font-extrabold text-primary-dark">{fileKind(f.name)}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{f.name}</span>
+                <span className="text-xs text-muted">{fileSize(f.size)}</span>
+                <button type="button" className="text-sm text-danger" onClick={() => setRemoved(r => [...r, f])}>הסרה</button>
+              </div>
+            ))}
+            {added.map((f, i) => (
+              <div key={`new-${i}`} className="flex items-center gap-3 rounded-xl border border-dashed border-primary/50 bg-primary-soft/30 px-3 py-2">
+                <span className="grid h-8 w-10 shrink-0 place-items-center rounded-md bg-primary-soft text-[10px] font-extrabold text-primary-dark">{fileKind(f.name)}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{f.name}</span>
+                <span className="text-xs text-muted">{fileSize(f.size)} · יעלה בשמירה</span>
+                <button type="button" className="text-sm text-danger" onClick={() => setAdded(a => a.filter((_, j) => j !== i))}>הסרה</button>
+              </div>
+            ))}
+          </div>
+          <input ref={fileInput} id="event-files-input" type="file" multiple className="hidden"
+            onChange={e => {
+              const picked = Array.from(e.target.files ?? []);
+              const big = picked.filter(f => f.size > MAX_FILE_MB * 1024 * 1024);
+              if (big.length) setErr(`קבצים מעל ${MAX_FILE_MB}MB לא יצורפו: ${big.map(f => f.name).join(', ')}`);
+              setAdded(a => [...a, ...picked.filter(f => f.size <= MAX_FILE_MB * 1024 * 1024)]);
+              e.target.value = '';
+            }} />
+          <button type="button" onClick={() => fileInput.current?.click()}
+            className="mt-2 w-full rounded-xl border-2 border-dashed border-line py-3 text-sm font-semibold text-muted hover:border-primary hover:text-primary">
+            + צירוף קובץ מהמחשב (תפריט, הצעת מחיר, תמונה…)
+          </button>
+        </div>
+
         {err && <p className="rounded-xl bg-danger-soft p-3 text-sm text-danger">{err}</p>}
       </div>
 
@@ -177,7 +220,7 @@ export function EventEditor({ initial, status, onClose, onSaved }: {
         {live
           ? <Btn className="flex-1" disabled={busy} onClick={() => save(false)}>שמירה ועדכון כולם</Btn>
           : <>
-              <Btn kind="success" className="flex-1" disabled={busy} onClick={() => save(true)}>📣 שמירה ופרסום</Btn>
+              <Btn kind="success" className="flex-1" disabled={busy} onClick={() => save(true)}>שמירה ופרסום</Btn>
               <Btn kind="ghost" disabled={busy} onClick={() => save(false)}>שמירה כטיוטה</Btn>
             </>}
       </div>

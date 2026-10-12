@@ -46,3 +46,15 @@ export interface EventDraft {
   tentative: boolean;
   tasks: { id?: string; department_id: string; description: string }[];
 }
+
+export interface EventFile {
+  id: string;
+  event_id: string;
+  name: string;
+  path: string;
+  size: number;
+  mime: string | null;
+  created_at: string;
+}
+
+export const MAX_FILE_MB = 20;

@@ -63,9 +63,24 @@ export function sortByTime(a: EventRow, b: EventRow): number {
   return (a.event_date + (hhmm(a.start_time) || '99')).localeCompare(b.event_date + (hhmm(b.start_time) || '99'));
 }
 
+// The colour legend of the weekly board the team already knows.
 export const CATEGORY: Record<EventRow['category'], { label: string; color: string }> = {
-  events:  { label: 'אירועים - יהלי', color: '#8b5cf6' },
-  kitchen: { label: 'אירועים - מטבח', color: '#ef4444' },
-  welfare: { label: 'אירועים - רווחה', color: '#10b981' },
-  cafe:    { label: 'אירועים - קפה',  color: '#f59e0b' },
+  events:  { label: 'אירועים - יהלי', color: '#dc3b3b' },
+  kitchen: { label: 'אירועים - מטבח', color: '#7c4ddb' },
+  welfare: { label: 'אירועים - רווחה', color: '#2f6fdb' },
+  cafe:    { label: 'אירועים - קפה',  color: '#d9921a' },
 };
+export const TENTATIVE = { label: 'אירוע לא סגור', color: '#6b7080' };
+
+/** Stripe colour of an event: grey while it is not closed yet. */
+export const eventColor = (e: Pick<EventRow, 'category' | 'tentative' | 'status'>) =>
+  e.tentative || e.status === 'pending' ? TENTATIVE.color : CATEGORY[e.category].color;
+
+/** A soft fill of that colour that works on light and dark surfaces. */
+export const eventTint = (e: Pick<EventRow, 'category' | 'tentative' | 'status'>, pct = 13) =>
+  `color-mix(in oklab, ${eventColor(e)} ${pct}%, var(--color-surface))`;
+
+/** When anything a worker sees on this event last changed (event fields or any task text). */
+export function lastChange(e: EventRow, tasks: TaskRow[]): number {
+  return Math.max(Date.parse(e.content_updated_at), ...tasks.map(t => Date.parse(t.content_updated_at)));
+}

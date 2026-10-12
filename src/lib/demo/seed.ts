@@ -18,11 +18,12 @@ export interface DemoDb {
   events: EventRow[];
   tasks: TaskRow[];
   requests: DemoRequest[];
+  files: import('../types').EventFile[];
   inviteLog: { event_id: string; person_id: string; email: string; sequence: number; fingerprint: string | null; state: 'sent' | 'cancelled' }[];
   mondayPool: number;
 }
 
-export const DEMO_VERSION = 2;
+export const DEMO_VERSION = 4;
 
 export function seed(): DemoDb {
   const now = new Date().toISOString();
@@ -31,11 +32,11 @@ export function seed(): DemoDb {
   const day = (n: number) => addDays(W, n);
 
   const departments: Department[] = [
-    { id: 'events', name: 'אירועים', color: '#8b5cf6', sort: 1 },
-    { id: 'kitchen', name: 'מטבח', color: '#ef4444', sort: 2 },
-    { id: 'mk', name: 'מטבחונים (MK)', color: '#0ea5e9', sort: 3 },
-    { id: 'cafe', name: 'קפה ובר בריאות', color: '#f59e0b', sort: 4 },
-    { id: 'ops', name: 'אופרציה', color: '#10b981', sort: 5 },
+    { id: 'events', name: 'אירועים', color: '#dc3b3b', sort: 1 },
+    { id: 'kitchen', name: 'מטבח', color: '#1f9d55', sort: 2 },
+    { id: 'mk', name: 'MK', color: '#d9921a', sort: 3 },
+    { id: 'cafe', name: 'קפה', color: '#2f6fdb', sort: 4 },
+    { id: 'ops', name: 'שירה', color: '#0e9aa7', sort: 5 },
     { id: 'site', name: 'ניהול אתר', color: '#64748b', sort: 6 },
   ];
   const P = (id: string, name: string, role_title: string, depts: string[], is_admin = false) =>
@@ -138,6 +139,7 @@ export function seed(): DemoDb {
       item_id: 'mon-1', status: 'new', event_id: null, suggested_event_id: okt, received_at: now,
       fields: { title: 'Oktoberfest - Hila', event_date: day(7), start_time: '13:00', guests: 80, location: 'Club', menu: 'Sausages ×80', requester: 'הילה כהן', notes: null },
     }],
+    files: [],
     inviteLog: [],
     mondayPool: 0,
   };

@@ -1,13 +1,13 @@
-import { CATEGORY, closeEvents, sortByTime } from '../lib/board';
-import { WEEKDAYS, addDays, dayTitle, hhmm, monthGrid, relativeDay, startOfWeek, todayIso, weekday } from '../lib/dates';
+import { CATEGORY, TENTATIVE, closeEvents, eventColor, sortByTime } from '../lib/board';
+import { WEEKDAYS, WEEKDAYS_LONG, addDays, hhmm, monthGrid, relativeDay, startOfWeek, todayIso, weekday } from '../lib/dates';
 import type { EventRow, TaskRow } from '../lib/types';
 import { EventCard } from './EventCard';
-import { Empty } from './ui';
 
 interface ViewProps {
   date: string;
   events: EventRow[];
   tasksByEvent: Map<string, TaskRow[]>;
+  changed: Set<string>;
   onOpen: (e: EventRow) => void;
 }
 
@@ -17,87 +17,111 @@ const byDay = (events: EventRow[]) => {
   return m;
 };
 
-export function MonthView({ date, events, onOpen, onPickDay }: ViewProps & { onPickDay: (d: string) => void }) {
-  const today = todayIso();
-  const days = byDay(events);
-  const month = date.slice(0, 7);
-  // The site works Sunday–Thursday: show Friday/Saturday only when something is on.
-  const grid = monthGrid(date);
-  const weekend = grid.flat().some(d => weekday(d) >= 5 && days.get(d)?.length);
-  const cols = weekend ? 7 : 5;
-  const cells = grid.flatMap(w => w.slice(0, cols));
+export function Legend() {
   return (
-    <div className="px-2 pb-4">
-      <div className={`grid text-center text-xs font-bold text-muted ${cols === 7 ? 'grid-cols-7' : 'grid-cols-5'}`}>
-        {WEEKDAYS.slice(0, cols).map(w => <div key={w} className="py-1.5">{w}</div>)}
-      </div>
-      <div className={`grid gap-1 ${cols === 7 ? 'grid-cols-7' : 'grid-cols-5'}`}>
-        {cells.map(d => {
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
+      {[...Object.values(CATEGORY), TENTATIVE].map(c => (
+        <span key={c.label} className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-[3px] border-2" style={{ borderColor: c.color, background: `color-mix(in oklab, ${c.color} 15%, var(--color-surface))` }} />
+          {c.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Column / section heading: big day number, weekday, count. */
+function DayHead({ day, count }: { day: string; count: number }) {
+  const today = todayIso();
+  const rel = relativeDay(day, today);
+  const isToday = day === today;
+  return (
+    <div className="flex items-baseline gap-2 pb-3">
+      <span className={`font-display text-[40px] leading-none font-extrabold ${isToday ? 'text-primary' : ''}`}>{+day.slice(8)}</span>
+      <span className={`text-[17px] font-bold ${isToday ? 'text-primary' : ''}`}>{WEEKDAYS_LONG[weekday(day)]}{rel && rel !== 'אתמול' && <span> · {rel}</span>}</span>
+      <span className="mr-auto text-[13px] text-muted">{count ? `${count} אירועים` : 'אין אירועים'}</span>
+    </div>
+  );
+}
+
+function DayColumn({ events, tasksByEvent, changed, onOpen }: { events: EventRow[] } & Omit<ViewProps, 'date' | 'events'>) {
+  const close = closeEvents(events);
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {events.map(e => <EventCard key={e.id} event={e} tasks={tasksByEvent.get(e.id) ?? []} close={close.has(e.id)} changed={changed.has(e.id)} onOpen={() => onOpen(e)} />)}
+    </div>
+  );
+}
+
+/** Desktop: day columns side by side. Phone: the same days stacked. */
+export function WeekView({ date, events, tasksByEvent, changed, onOpen }: ViewProps) {
+  const start = startOfWeek(date);
+  const days = byDay(events);
+  const all = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const shown = all.filter((d, i) => i < 5 || days.get(d)?.length);   // Fri/Sat only when something is on
+  return (
+    <div>
+      <div className={`grid grid-cols-1 gap-6 lg:gap-0 ${shown.length === 7 ? 'lg:grid-cols-7' : shown.length === 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+        {shown.map(d => {
           const list = days.get(d) ?? [];
-          const out = d.slice(0, 7) !== month;
-          const isWeekend = weekday(d) >= 5;
           return (
-            <div key={d} onClick={() => onPickDay(d)}
-              className={`flex min-h-24 cursor-pointer flex-col rounded-lg border p-1 sm:min-h-28 ${out ? 'border-transparent bg-transparent opacity-40' : isWeekend ? 'border-line bg-surface-2/60' : 'border-line bg-surface'} ${d === today ? 'ring-2 ring-primary' : ''}`}>
-              <div className={`mb-0.5 text-xs font-bold ${d === today ? 'text-primary' : 'text-muted'}`}>{+d.slice(8)}</div>
-              <div className="flex flex-col gap-0.5">
-                {list.slice(0, 3).map(e => (
-                  <button key={e.id} onClick={ev => { ev.stopPropagation(); onOpen(e); }}
-                    className={`line-clamp-2 rounded px-1 py-0.5 text-right text-[10.5px] font-semibold leading-tight break-words text-white sm:text-xs ${e.status === 'cancelled' ? 'line-through opacity-50' : ''} ${e.tentative || e.status === 'pending' ? 'opacity-70 outline-1 outline-dashed outline-white' : ''}`}
-                    style={{ background: CATEGORY[e.category].color }} title={e.title}>
-                    {e.start_time && <span className="ltr ml-0.5 opacity-90">{hhmm(e.start_time)}</span>} {e.title}
-                  </button>
-                ))}
-                {list.length > 3 && <span className="text-[10.5px] font-bold text-primary">+{list.length - 3} נוספים</span>}
-              </div>
-            </div>
+            <section key={d} className={`min-w-0 px-4 lg:border-l lg:border-line lg:px-3 lg:last:border-l-0 ${!list.length ? 'max-lg:hidden' : ''}`}>
+              <DayHead day={d} count={list.length} />
+              <DayColumn events={list} tasksByEvent={tasksByEvent} changed={changed} onOpen={onOpen} />
+            </section>
           );
         })}
       </div>
-      <Legend />
+      {!shown.some(d => days.get(d)?.length) && <p className="py-16 text-center text-muted">אין אירועים השבוע</p>}
     </div>
   );
 }
 
-export function Legend() {
+export function DayView({ date, events, tasksByEvent, changed, onOpen }: ViewProps) {
+  const list = events.filter(e => e.event_date === date).sort(sortByTime);
   return (
-    <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted">
-      {Object.values(CATEGORY).map(c => (
-        <span key={c.label} className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: c.color }} />{c.label}</span>
-      ))}
-      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-dashed border-muted" />לא סגור / טיוטה</span>
-    </div>
-  );
-}
-
-function DayBlock({ day, events, tasksByEvent, onOpen, showEmpty }: { day: string; showEmpty?: boolean } & Omit<ViewProps, 'date'>) {
-  const today = todayIso();
-  const rel = relativeDay(day, today);
-  const close = closeEvents(events);
-  if (!events.length && !showEmpty) return null;
-  return (
-    <section className="mb-4">
-      <h2 className={`sticky top-0 z-10 -mx-3 mb-2 bg-bg/95 px-3 py-1.5 text-sm font-bold backdrop-blur ${day === today ? 'text-primary' : ''}`}>
-        {rel && <span className="ml-1.5 rounded-full bg-primary px-2 py-0.5 text-xs text-white">{rel}</span>}
-        {dayTitle(day)}
-        <span className="mr-2 text-xs font-normal text-muted">{events.length ? `${events.length} אירועים` : ''}</span>
-      </h2>
-      {events.length
-        ? <div className="space-y-2">{events.map(e => <EventCard key={e.id} event={e} tasks={tasksByEvent.get(e.id) ?? []} close={close.has(e.id)} onOpen={() => onOpen(e)} />)}</div>
-        : <p className="py-4 text-center text-sm text-muted">אין אירועים</p>}
+    <section className="mx-auto max-w-2xl px-4">
+      <DayHead day={date} count={list.length} />
+      {list.length ? <DayColumn events={list} tasksByEvent={tasksByEvent} changed={changed} onOpen={onOpen} />
+        : <p className="py-12 text-center text-muted">אין אירועים ביום הזה</p>}
     </section>
   );
 }
 
-export function WeekView({ date, events, tasksByEvent, onOpen }: ViewProps) {
-  const start = startOfWeek(date);
+export function MonthView({ date, events, onOpen, onPickDay }: ViewProps & { onPickDay: (d: string) => void }) {
+  const today = todayIso();
   const days = byDay(events);
-  const week = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  if (!week.some(d => days.get(d)?.length)) return <Empty>אין אירועים השבוע 🎉</Empty>;
-  return <div className="px-3 pb-6">{week.map(d => <DayBlock key={d} day={d} events={days.get(d) ?? []} tasksByEvent={tasksByEvent} onOpen={onOpen} />)}</div>;
-}
-
-export function DayView({ date, events, tasksByEvent, onOpen }: ViewProps) {
-  const list = events.filter(e => e.event_date === date).sort(sortByTime);
-  return <div className="px-3 pb-6"><DayBlock day={date} events={list} tasksByEvent={tasksByEvent} onOpen={onOpen} showEmpty /></div>;
+  const month = date.slice(0, 7);
+  const grid = monthGrid(date);
+  const weekend = grid.flat().some(d => weekday(d) >= 5 && days.get(d)?.length);
+  const cols = weekend ? 7 : 5;
+  const cells = grid.flatMap(w => w.slice(0, cols));
+  const colCls = cols === 7 ? 'grid-cols-7' : 'grid-cols-5';
+  return (
+    <div className="px-2 sm:px-4">
+      <div className={`grid ${colCls} text-center text-[13px] font-bold text-muted`}>
+        {WEEKDAYS_LONG.slice(0, cols).map((w, i) => <div key={w} className="py-2"><span className="sm:hidden">{WEEKDAYS[i]}</span><span className="max-sm:hidden">{w}</span></div>)}
+      </div>
+      <div className={`grid ${colCls} gap-px overflow-hidden rounded-lg border border-line bg-line`}>
+        {cells.map(d => {
+          const list = days.get(d) ?? [];
+          const out = d.slice(0, 7) !== month;
+          return (
+            <div key={d} onClick={() => onPickDay(d)}
+              className={`flex min-h-24 cursor-pointer flex-col gap-1 p-1 sm:min-h-32 sm:p-1.5 ${out ? 'bg-surface-2/70' : 'bg-surface'}`}>
+              <div className={`font-display text-[15px] font-extrabold sm:text-[18px] ${d === today ? 'text-primary' : out ? 'text-muted/60' : ''}`}>{+d.slice(8)}</div>
+              {list.slice(0, 4).map(e => (
+                <button key={e.id} onClick={ev => { ev.stopPropagation(); onOpen(e); }}
+                  className={`line-clamp-2 rounded-[4px] px-1 py-0.5 text-right text-[10.5px] font-semibold leading-tight break-words sm:text-[12.5px] ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}
+                  style={{ background: `color-mix(in oklab, ${eventColor(e)} 15%, var(--color-surface))`, borderInlineEnd: `3px solid ${eventColor(e)}` }} title={e.title}>
+                  {e.start_time && <span className="ltr-nums text-muted">{hhmm(e.start_time)} </span>}{e.title}
+                </button>
+              ))}
+              {list.length > 4 && <span className="text-[11px] font-bold text-primary">+{list.length - 4} נוספים</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

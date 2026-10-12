@@ -2,7 +2,7 @@
 // Rules mirror the SQL in supabase/migrations so the demo behaves like the real thing.
 import { planInvites } from '../../../supabase/functions/_shared/invites';
 import { addDays, startOfWeek, todayIso } from '../dates';
-import type { AdminPerson, Department, EventDraft, EventRow, Me, MondayRequest, Person, TaskRow } from '../types';
+import type { AdminPerson, Department, EventDraft, EventFile, EventRow, Me, MondayRequest, Person, TaskRow } from '../types';
 import { DEMO_VERSION, mondayPool, seed, type DemoDb } from './seed';
 
 const KEY = 'events-board-demo';
@@ -148,6 +148,7 @@ export async function deleteDraft(eventId: string): Promise<void> {
   requireAdmin();
   const e = db().events.find(x => x.id === eventId);
   if (e?.status !== 'pending') throw new Error('only pending events can be deleted; cancel published ones');
+  memory!.files = db().files.filter(f => f.event_id !== eventId);
   memory!.events = db().events.filter(x => x.id !== eventId);
   memory!.tasks = db().tasks.filter(t => t.event_id !== eventId);
   commit();
@@ -300,4 +301,46 @@ export const personalLink = (token: string) => `${location.origin}/?join=${token
 export function subscribe(onChange: () => void): () => void {
   listeners.add(onChange);
   return () => { listeners.delete(onChange); };
+}
+
+// ------------------------------------------------------------ attached files (demo: kept in this browser)
+
+const FILES_KEY = `${KEY}-files`;
+const DEMO_MAX_MB = 2;
+const blobs = new Map<string, string>(); // path -> data URL, when storage is full or blocked
+
+function readBlobs(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(FILES_KEY) ?? '{}'); } catch { return {}; }
+}
+
+export async function listFiles(eventId: string): Promise<EventFile[]> {
+  const e = db().events.find(x => x.id === eventId);
+  return e && visible(e) ? clone(db().files.filter(f => f.event_id === eventId)) : [];
+}
+
+export async function uploadFile(eventId: string, file: File): Promise<void> {
+  requireAdmin();
+  if (file.size > DEMO_MAX_MB * 1024 * 1024) throw new Error(`בדמו אפשר לצרף קבצים עד ${DEMO_MAX_MB}MB ("${file.name}" גדול יותר)`);
+  const dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(file); });
+  const path = `${eventId}/${id()}`;
+  const all = readBlobs(); all[path] = dataUrl;
+  try { localStorage.setItem(FILES_KEY, JSON.stringify(all)); } catch { blobs.set(path, dataUrl); }
+  db().files.push({ id: id(), event_id: eventId, name: file.name, path, size: file.size, mime: file.type || null, created_at: nowIso() });
+  commit();
+}
+
+export async function deleteFile(f: EventFile): Promise<void> {
+  requireAdmin();
+  memory!.files = db().files.filter(x => x.id !== f.id);
+  const all = readBlobs(); delete all[f.path];
+  try { localStorage.setItem(FILES_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  blobs.delete(f.path);
+  commit();
+}
+
+export async function fileUrl(f: EventFile): Promise<string> {
+  const dataUrl = blobs.get(f.path) ?? readBlobs()[f.path];
+  if (!dataUrl) throw new Error('הקובץ לא נמצא בדפדפן הזה');
+  const blob = await (await fetch(dataUrl)).blob();
+  return URL.createObjectURL(blob);
 }

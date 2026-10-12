@@ -9,5 +9,5 @@ export const {
   joinWithToken, loadMe, signOut, loadReference, loadRange, loadEvent, markTask, saveEvent, setStatus,
   deleteDraft, syncInvites, loadPending, loadDirty, parseMessage, loadRequests, linkRequest,
   createFromRequest, dismissRequest, syncMondayNow, loadAdminPeople, savePerson, resetLink, setActive,
-  personalLink, subscribe,
+  personalLink, subscribe, listFiles, uploadFile, deleteFile, fileUrl,
 } = impl;

@@ -1,6 +1,7 @@
 // Every call the app makes to Supabase.
 import { supabase } from './supabase';
-import type { AdminPerson, Department, EventDraft, EventRow, Me, MondayRequest, Person, TaskRow } from './types';
+import type { AdminPerson, Department, EventDraft, EventFile, EventRow, Me, MondayRequest, Person, TaskRow } from './types';
+import { MAX_FILE_MB } from './types';
 
 function check<T>(r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(r.error.message);
@@ -144,4 +145,34 @@ export function subscribe(onChange: () => void): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'event_tasks' }, onChange)
     .subscribe();
   return () => { supabase.removeChannel(channel); };
+}
+
+// ------------------------------------------------------------ attached files
+
+const BUCKET = 'event-files';
+
+export async function listFiles(eventId: string): Promise<EventFile[]> {
+  return check(await supabase.from('event_files').select('*').eq('event_id', eventId).order('created_at')) as EventFile[];
+}
+
+export async function uploadFile(eventId: string, file: File): Promise<void> {
+  if (file.size > MAX_FILE_MB * 1024 * 1024) throw new Error(`הקובץ "${file.name}" גדול מ-${MAX_FILE_MB}MB`);
+  const ext = (file.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const path = `${eventId}/${crypto.randomUUID()}.${ext}`;   // storage keys stay ASCII; the real name is in the table
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined });
+  if (up.error) throw new Error(up.error.message);
+  const row = await supabase.from('event_files').insert({ event_id: eventId, name: file.name, path, size: file.size, mime: file.type || null });
+  if (row.error) { await supabase.storage.from(BUCKET).remove([path]); throw new Error(row.error.message); }
+}
+
+export async function deleteFile(f: EventFile): Promise<void> {
+  check(await supabase.from('event_files').delete().eq('id', f.id));
+  await supabase.storage.from(BUCKET).remove([f.path]);
+}
+
+/** A short-lived link that opens the file in the browser. */
+export async function fileUrl(f: EventFile): Promise<string> {
+  const r = await supabase.storage.from(BUCKET).createSignedUrl(f.path, 60 * 60);
+  if (r.error) throw new Error(r.error.message);
+  return r.data.signedUrl;
 }

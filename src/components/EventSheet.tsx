@@ -1,11 +1,12 @@
 import { ask } from './Confirm';
 import { useState } from 'react';
 import { deleteDraft, setStatus, syncInvites } from '../lib/api';
-import { CATEGORY } from '../lib/board';
+import { eventColor } from '../lib/board';
 import { invitesNote } from '../lib/toast';
 import { dayTitle, relativeDay, todayIso } from '../lib/dates';
 import type { EventRow, TaskRow as Task } from '../lib/types';
 import { TaskRow } from './TaskRow';
+import { FileList } from './Files';
 import { Btn, Sheet, Time, useApp } from './ui';
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -27,8 +28,8 @@ export function StatusPill({ e }: { e: EventRow }) {
   return null;
 }
 
-export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onChanged }: {
-  event: EventRow; tasks: Task[]; onClose: () => void; onEdit: () => void; onDuplicate: () => void; onChanged: () => void;
+export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onChanged, onPrint }: {
+  event: EventRow; tasks: Task[]; onClose: () => void; onEdit: () => void; onDuplicate: () => void; onChanged: () => void; onPrint: () => void;
 }) {
   const { me } = useApp();
   const [busy, setBusy] = useState(false);
@@ -56,7 +57,7 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
   return (
     <Sheet onClose={onClose} title={
       <span className="flex items-center gap-2">
-        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: CATEGORY[e.category].color }} />
+        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: eventColor(e) }} />
         <span className={`truncate ${e.status === 'cancelled' ? 'line-through' : ''}`}>{e.title}</span>
       </span>
     }>
@@ -89,6 +90,8 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
           <Fact label="מזמין">{e.requester}</Fact>
         </div>
 
+        <FileList eventId={e.id} version={e.updated_at} />
+
         {mine.length > 0 && (
           <section>
             <h3 className="mb-2 text-sm font-bold text-primary">המשימות שלי</h3>
@@ -104,13 +107,16 @@ export function EventSheet({ event: e, tasks, onClose, onEdit, onDuplicate, onCh
 
         {note && <p className="rounded-xl bg-surface-2 p-3 text-sm">{note}</p>}
 
+        <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+          <Btn kind="ghost" onClick={onPrint}>הדפסה / PDF</Btn>
+        </div>
         {me.is_admin && (
-          <div className="flex flex-wrap gap-2 border-t border-line pt-4">
-            <Btn onClick={onEdit}>✏️ עריכה</Btn>
-            {e.status === 'pending' && <Btn kind="success" disabled={busy} onClick={() => changeStatus('published')}>📣 פרסום לכולם</Btn>}
+          <div className="flex flex-wrap gap-2">
+            <Btn onClick={onEdit}>עריכה</Btn>
+            {e.status === 'pending' && <Btn kind="success" disabled={busy} onClick={() => changeStatus('published')}>פרסום לכולם</Btn>}
             {e.status === 'published' && <Btn kind="danger" disabled={busy} onClick={() => changeStatus('cancelled')}>ביטול אירוע</Btn>}
             {e.status === 'cancelled' && <Btn kind="soft" disabled={busy} onClick={() => changeStatus('published')}>החזרת האירוע</Btn>}
-            <Btn kind="ghost" onClick={onDuplicate}>⧉ שכפול</Btn>
+            <Btn kind="ghost" onClick={onDuplicate}>שכפול</Btn>
             {e.status === 'pending' && <Btn kind="ghost" onClick={remove}>מחיקת טיוטה</Btn>}
           </div>
         )}

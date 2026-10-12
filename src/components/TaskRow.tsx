@@ -44,8 +44,8 @@ export function TaskRow({ task, event, onChanged }: { task: Task; event: EventRo
       )}
       {canMark && (
         <div className="mt-2 flex gap-2">
-          {(state === 'new' || state === 'updated') && <Btn kind="primary" disabled={busy} onClick={() => act('seen')}>👍 ראיתי</Btn>}
-          {state !== 'done' && <Btn kind="ghost" disabled={busy} onClick={() => act('done')}>✓ בוצע</Btn>}
+          {(state === 'new' || state === 'updated') && <Btn kind="primary" disabled={busy} onClick={() => act('seen')}>ראיתי</Btn>}
+          {state !== 'done' && <Btn kind="ghost" disabled={busy} onClick={() => act('done')}>בוצע ✓</Btn>}
           {state === 'done' && <Btn kind="ghost" disabled={busy} onClick={() => act('undo')}>ביטול "בוצע"</Btn>}
         </div>
       )}

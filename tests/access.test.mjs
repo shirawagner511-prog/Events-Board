@@ -134,3 +134,20 @@ test('paid operations staff is saved, cleared with 0, and counts as a content ch
   assert.equal(b.paid_staff, null);
   assert.ok(b.content_updated_at > a.content_updated_at);
 });
+
+test('event files: admins attach, members of visible events read, drafts stay hidden', async () => {
+  const id = await saveEvent(yahli.uid, { title: 'עם תפריט', event_date: '2026-10-26' });
+  await assert.rejects(asUser(liel.uid, run => run(
+    `insert into event_files (event_id, name, path) values ($1, 'menu.pdf', $2)`, [id, `${id}/a.pdf`])), /row-level security/);
+  const [f] = await asUser(yahli.uid, run => run(
+    `insert into event_files (event_id, name, path, size) values ($1, 'תפריט מורחב.pdf', $2, 1234) returning uploaded_by`, [id, `${id}/b.pdf`]));
+  assert.equal(f.uploaded_by, yahli.id);
+  assert.equal((await asUser(liel.uid, run => run(`select * from event_files where event_id = $1`, [id]))).length, 0, 'draft');
+  await asUser(yahli.uid, run => run(`select set_event_status($1, 'published')`, [id]));
+  const rows = await asUser(liel.uid, run => run(`select name from event_files where event_id = $1`, [id]));
+  assert.deepEqual(rows.map(r => r.name), ['תפריט מורחב.pdf']);
+  await assert.rejects(asUser(liel.uid, async run => {
+    const r = await run(`delete from event_files where event_id = $1 returning id`, [id]);
+    if (!r.length) throw new Error('nothing deleted');
+  }), /nothing deleted/);
+});

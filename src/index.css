@@ -1,16 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Rubik:wght@600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #f6f5fb;
+  /* Layout: a paper week board - neutral grey ground, white day columns, tinted event cards, ink-dark controls */
+  --color-bg: #f2f2f5;
   --color-surface: #ffffff;
-  --color-surface-2: #eeecf7;
-  --color-line: #e3e0ee;
-  --color-primary: #5b4bdb;
-  --color-primary-dark: #4536b8;
-  --color-primary-soft: #e9e6fc;
-  --color-ink: #23203a;
-  --color-muted: #7c7896;
+  --color-surface-2: #ebebf0;
+  --color-line: #dedee6;
+  --color-primary: #3d3fe0;
+  --color-primary-dark: #2c2db8;
+  --color-primary-soft: #e6e6fc;
+  --color-ink: #1b1d29;
+  --color-muted: #6e7184;
+  --color-control: #1d2132;      /* active toggle / chip */
+  --color-control-ink: #ffffff;
   --color-success: #1f9d68;
   --color-success-soft: #dcf3e8;
   --color-warning: #c27c0e;
@@ -18,23 +21,24 @@
   --color-danger: #d9443f;
   --color-danger-soft: #fde4e3;
   --font-sans: 'Heebo', system-ui, -apple-system, sans-serif;
+  --font-display: 'Rubik', 'Heebo', system-ui, sans-serif;
 }
 
 /* Dark palette: same tokens, redefined (system setting, or an explicit data-theme) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #15131f; --color-surface: #1f1c2c; --color-surface-2: #2a2640; --color-line: #38324f;
-    --color-primary: #8174f2; --color-primary-dark: #a99ff7; --color-primary-soft: #2d2750;
-    --color-ink: #ece9f7; --color-muted: #a39ec0;
+    --color-bg: #121319; --color-surface: #1c1d26; --color-surface-2: #262833; --color-line: #33354a;
+    --color-primary: #7c7ef5; --color-primary-dark: #a7a8fa; --color-primary-soft: #2a2b55;
+    --color-ink: #ecedf4; --color-muted: #9fa2b8; --color-control: #ecedf4; --color-control-ink: #15161e;
     --color-success: #3cc48a; --color-success-soft: #173a2b; --color-warning: #f0b347; --color-warning-soft: #3d2f12;
     --color-danger: #f0706b; --color-danger-soft: #45201f;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --color-bg: #15131f; --color-surface: #1f1c2c; --color-surface-2: #2a2640; --color-line: #38324f;
-  --color-primary: #8174f2; --color-primary-dark: #a99ff7; --color-primary-soft: #2d2750;
-  --color-ink: #ece9f7; --color-muted: #a39ec0;
+  --color-bg: #121319; --color-surface: #1c1d26; --color-surface-2: #262833; --color-line: #33354a;
+  --color-primary: #7c7ef5; --color-primary-dark: #a7a8fa; --color-primary-soft: #2a2b55;
+  --color-ink: #ecedf4; --color-muted: #9fa2b8; --color-control: #ecedf4; --color-control-ink: #15161e;
   --color-success: #3cc48a; --color-success-soft: #173a2b; --color-warning: #f0b347; --color-warning-soft: #3d2f12;
   --color-danger: #f0706b; --color-danger-soft: #45201f;
   color-scheme: dark;
@@ -52,9 +56,26 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 /* Times and numbers stay left-to-right inside Hebrew text */
+.ltr-nums { font-feature-settings: 'tnum' 1; }
 .ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; font-feature-settings: 'tnum' 1; }
 .pb-safe { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); }
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
 input, textarea, select { font: inherit; }
 @keyframes sheetIn { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
 .sheet-in { animation: sheetIn .22s ease-out both; }
+
+/* ------------------------------------------------------------ print */
+.print-table th, .print-table td { border: 1px solid #111; padding: 1.6mm 2mm; }
+.print-table th { background: #e6e6e6; font-weight: 800; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  html, body { background: #fff !important; height: auto !important; }
+  #root, .no-print { display: none !important; }
+  .print-overlay { position: static !important; overflow: visible !important; background: #fff !important; }
+  .print-paper { width: auto !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+  .print-keep-color { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-table thead { display: table-header-group; }
+  .print-row { break-inside: avoid; }
+  .print-day h2 { break-after: avoid; }
+}

@@ -1,22 +1,24 @@
-import { ask } from '../components/Confirm';
 import { useEffect, useMemo, useState } from 'react';
+import { ask } from '../components/Confirm';
+import { EventSheet } from '../components/EventSheet';
+import { PrintView } from '../components/PrintView';
+import { DayView, Legend, MonthView, WeekView } from '../components/Views';
+import { Sheet, useApp } from '../components/ui';
 import { loadEvent, loadPending, loadRequests, signOut } from '../lib/api';
-import { isMine, isMyTask, needsAttention } from '../lib/board';
-import { addDays, addMonths, dayTitle, monthGrid, monthTitle, shortDate, startOfWeek, todayIso } from '../lib/dates';
+import { eventColor, isMine, isMyTask, lastChange, needsAttention, sortByTime } from '../lib/board';
+import { MONTHS, addDays, addMonths, dayTitle, monthGrid, monthTitle, shortDate, startOfWeek, todayIso } from '../lib/dates';
 import type { EventDraft, EventRow, TaskRow } from '../lib/types';
 import { useBoard } from '../lib/useBoard';
-import { EventSheet } from '../components/EventSheet';
-import { DayView, MonthView, WeekView } from '../components/Views';
-import { Btn, useApp } from '../components/ui';
 import { EventEditor, draftFrom, emptyDraft } from './EventEditor';
 import { Inbox } from './Inbox';
 import { People } from './People';
 
 type View = 'month' | 'week' | 'day';
-type Scope = 'mine' | 'all';
+/** 'all', 'mine', or a department id. */
+type Scope = string;
 
-const stored = <T extends string>(k: string, fallback: T): T => {
-  try { return (localStorage.getItem(k) as T) || fallback; } catch { return fallback; }
+const stored = (k: string, fallback: string): string => {
+  try { return localStorage.getItem(k) || fallback; } catch { return fallback; }
 };
 const store = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 
@@ -26,16 +28,38 @@ function rangeFor(view: View, date: string): [string, string] {
   return [date, date];
 }
 
+function Title({ view, date }: { view: View; date: string }) {
+  const year = <span className="mr-2 align-middle text-[15px] font-semibold text-muted">{date.slice(0, 4)}</span>;
+  if (view === 'month') return <>{MONTHS[+date.slice(5, 7) - 1]}{year}</>;
+  if (view === 'day') return <>{dayTitle(date).replace('יום ', '')}{year}</>;
+  const s = startOfWeek(date), e = addDays(s, 4);
+  const sameMonth = s.slice(5, 7) === e.slice(5, 7);
+  return <>
+    <span className="ltr-nums">{+s.slice(8)}—{+e.slice(8)}</span>{' '}
+    {sameMonth ? `ב${MONTHS[+s.slice(5, 7) - 1]}` : `${MONTHS[+s.slice(5, 7) - 1]}–${MONTHS[+e.slice(5, 7) - 1]}`}{year}
+  </>;
+}
+
+const seg = (on: boolean) => `px-3 py-1.5 text-[14px] sm:px-4 sm:py-2 sm:text-[15px] font-semibold transition ${on ? 'bg-control text-control-ink' : 'bg-surface text-ink hover:bg-surface-2'}`;
+const ctl = 'inline-flex h-10 items-center justify-center rounded-xl border border-line bg-surface px-3 text-[14px] font-semibold hover:bg-surface-2 sm:h-11 sm:px-3.5 sm:text-[15px]';
+
 export function Board() {
-  const { me } = useApp();
+  const { me, departments } = useApp();
   const today = todayIso();
-  const [view, setView] = useState<View>(() => stored('view', 'week'));
+  const [view, setView] = useState<View>(() => stored('view', 'week') as View);
   const [scope, setScope] = useState<Scope>(() => stored('scope', me.departments.length && !me.is_admin ? 'mine' : 'all'));
   const [date, setDate] = useState(today);
   const [open, setOpen] = useState<{ event: EventRow; tasks: TaskRow[] } | null>(null);
   const [editor, setEditor] = useState<{ draft: EventDraft; status?: EventRow['status'] } | null>(null);
-  const [panel, setPanel] = useState<'inbox' | 'people' | null>(null);
+  const [panel, setPanel] = useState<'inbox' | 'people' | 'changes' | null>(null);
+  const [print, setPrint] = useState<{ title: string; events: EventRow[]; tasksByEvent: Map<string, TaskRow[]> } | null>(null);
   const [inboxCount, setInboxCount] = useState(0);
+  const seenKey = `changes-seen-${me.id}`;
+  const [seenAt, setSeenAt] = useState(() => {
+    const v = stored(seenKey, '');
+    if (!v) store(seenKey, new Date().toISOString());
+    return v ? Date.parse(v) : Date.now();
+  });
 
   useEffect(() => store('view', view), [view]);
   useEffect(() => store('scope', scope), [scope]);
@@ -44,14 +68,25 @@ export function Board() {
   const board = useBoard(from, to);
   const soon = useBoard(today, addDays(today, 1));
 
-  const visible = useMemo(() => board.events.filter(e =>
-    (e.status !== 'pending' || me.is_admin) && (scope === 'all' || isMine(e, board.tasksByEvent.get(e.id) ?? [], me))),
-  [board.events, board.tasksByEvent, scope, me]);
+  const matches = (e: EventRow) => {
+    const tasks = board.tasksByEvent.get(e.id) ?? [];
+    if (scope === 'all') return true;
+    if (scope === 'mine') return isMine(e, tasks, me);
+    return tasks.some(t => t.department_id === scope);
+  };
+  const visible = useMemo(() => board.events.filter(e => (e.status !== 'pending' || me.is_admin) && matches(e)),
+    [board.events, board.tasksByEvent, scope, me]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const changed = useMemo(() => new Set(board.events
+    .filter(e => e.status !== 'pending' && lastChange(e, board.tasksByEvent.get(e.id) ?? []) > seenAt)
+    .map(e => e.id)), [board.events, board.tasksByEvent, seenAt]);
+  const changedList = board.events.filter(e => changed.has(e.id))
+    .sort((a, b) => lastChange(b, board.tasksByEvent.get(b.id) ?? []) - lastChange(a, board.tasksByEvent.get(a.id) ?? []));
+  const markAllSeen = () => { const now = new Date().toISOString(); store(seenKey, now); setSeenAt(Date.parse(now)); setPanel(null); };
 
   const myAttention = needsAttention(soon.events, soon.tasksByEvent, today, t => isMyTask(t, me));
   const teamAttention = me.is_admin ? needsAttention(soon.events, soon.tasksByEvent, today) : [];
 
-  // Keep an open event in sync with live updates.
   useEffect(() => {
     if (!open) return;
     const e = board.events.find(x => x.id === open.event.id) ?? soon.events.find(x => x.id === open.event.id);
@@ -74,81 +109,106 @@ export function Board() {
 
   const refreshAll = () => { board.refresh(); soon.refresh(); };
   const step = (n: number) => setDate(d => (view === 'month' ? addMonths(d, n) : addDays(d, view === 'week' ? 7 * n : n)));
-  const title = view === 'month' ? monthTitle(date) : view === 'week' ? `שבוע ${shortDate(startOfWeek(date))}–${shortDate(addDays(startOfWeek(date), 6))}` : dayTitle(date);
+  const openEvent = (e: EventRow) => setOpen({ event: e, tasks: board.tasksByEvent.get(e.id) ?? [] });
+  const scopeName = scope === 'all' ? '' : scope === 'mine' ? ` · ${me.name}` : ` · ${departments.find(d => d.id === scope)?.name ?? ''}`;
+  const printTitle = view === 'month' ? monthTitle(date) : view === 'day' ? dayTitle(date)
+    : `שבוע ${shortDate(startOfWeek(date))}–${shortDate(addDays(startOfWeek(date), 6))}`;
+  const nowLabel = view === 'month' ? 'החודש' : view === 'week' ? 'השבוע' : 'היום';
+  const inCurrent = from <= today && today <= to;
+
+  const chips: { id: Scope; label: string; color?: string }[] = [
+    { id: 'all', label: 'הכל' },
+    ...(me.departments.length ? [{ id: 'mine', label: 'שלי' }] : []),
+    ...departments.filter(d => d.id !== 'site').map(d => ({ id: d.id, label: d.name, color: d.color })),
+  ];
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col">
-      <header className="pt-safe sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="flex items-center gap-2 px-3 pt-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-muted">שלום {me.name} 👋</div>
-            <h1 className="truncate text-lg font-extrabold">לוח אירועים</h1>
-          </div>
-          {me.is_admin && (
-            <>
-              <button onClick={() => setPanel('inbox')} className="relative rounded-xl bg-surface-2 px-3 py-2 text-sm font-semibold">
-                📥 ממתינים
-                {inboxCount > 0 && <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] text-white">{inboxCount}</span>}
+    <div className="mx-auto flex min-h-full max-w-[1500px] flex-col">
+      <header className="pt-safe sticky top-0 z-20 border-b border-line bg-bg/95 px-4 pb-3 backdrop-blur sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pt-3">
+          <h1 className="font-display min-w-0 flex-1 text-[26px] leading-tight font-extrabold text-balance sm:text-[38px]"><Title view={view} date={date} /></h1>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {me.is_admin && (
+              <button onClick={() => setPanel('inbox')} className={`${ctl} relative`}>
+                ממתינים
+                {inboxCount > 0 && <span className="absolute -left-2 -top-2 grid h-6 min-w-6 place-items-center rounded-full bg-danger px-1 text-[12px] font-bold text-white">{inboxCount}</span>}
               </button>
-              <button onClick={() => setPanel('people')} aria-label="אנשים" className="rounded-xl bg-surface-2 px-3 py-2 text-sm">👥</button>
-            </>
-          )}
-          <button onClick={async () => { if (await ask('להתנתק מהמכשיר הזה?', { ok: 'התנתקות' })) signOut().then(() => location.reload()); }} aria-label="התנתקות" title="התנתקות" className="rounded-xl px-2 py-2 text-sm text-muted">🚪</button>
-        </div>
-
-        <div className="flex items-center gap-2 px-3 py-2">
-          <div className="flex rounded-xl bg-surface-2 p-0.5 text-sm font-semibold">
-            {(['mine', 'all'] as Scope[]).map(s => (
-              <button key={s} onClick={() => setScope(s)} className={`rounded-lg px-3 py-1.5 ${scope === s ? 'bg-surface shadow-sm text-primary' : 'text-muted'}`}>{s === 'mine' ? 'שלי' : 'הכל'}</button>
-            ))}
-          </div>
-          <div className="mr-auto flex rounded-xl bg-surface-2 p-0.5 text-sm font-semibold">
-            {(['day', 'week', 'month'] as View[]).map(v => (
-              <button key={v} onClick={() => setView(v)} className={`rounded-lg px-3 py-1.5 ${view === v ? 'bg-surface shadow-sm text-primary' : 'text-muted'}`}>{{ day: 'יום', week: 'שבוע', month: 'חודש' }[v]}</button>
-            ))}
+            )}
+            <button onClick={() => setPanel('changes')} className={`${ctl} relative`}>
+              שינויים
+              {changed.size > 0 && <span className="absolute -left-2 -top-2 grid h-6 min-w-6 place-items-center rounded-full bg-primary px-1 text-[12px] font-bold text-white">{changed.size}</span>}
+            </button>
+            <button aria-label="הקודם" onClick={() => step(-1)} className={`${ctl} w-10 px-0 text-lg sm:w-11`}>›</button>
+            <button onClick={() => setDate(today)} disabled={inCurrent} className={`${ctl} disabled:opacity-50`}>{nowLabel}</button>
+            <button aria-label="הבא" onClick={() => step(1)} className={`${ctl} w-10 px-0 text-lg sm:w-11`}>‹</button>
+            <div className="flex overflow-hidden rounded-xl border border-line">
+              {(['day', 'week', 'month'] as View[]).map(v => (
+                <button key={v} onClick={() => setView(v)} className={seg(view === v)}>{{ day: 'יום', week: 'שבוע', month: 'חודש' }[v]}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 px-2 pb-2">
-          <button aria-label="הקודם" onClick={() => step(-1)} className="grid h-9 w-9 place-items-center rounded-full text-xl hover:bg-surface-2">›</button>
-          <div className="flex-1 text-center font-bold">{title}</div>
-          {date !== today && <button onClick={() => setDate(today)} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-bold text-primary">היום</button>}
-          <button aria-label="הבא" onClick={() => step(1)} className="grid h-9 w-9 place-items-center rounded-full text-xl hover:bg-surface-2">‹</button>
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">
+            <span className="shrink-0 text-[14px] text-muted">אני מ:</span>
+            {chips.map(c => (
+              <button key={c.id} onClick={() => setScope(c.id)}
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[14px] font-semibold ${scope === c.id ? 'border-control bg-control text-control-ink' : 'border-line bg-surface hover:bg-surface-2'}`}>
+                {c.color && <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />}
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div className="max-md:hidden"><Legend /></div>
         </div>
       </header>
 
-      {myAttention.length > 0 && (
-        <button onClick={() => setOpen({ event: myAttention[0].event, tasks: soon.tasksByEvent.get(myAttention[0].event.id) ?? [] })}
-          className="mx-3 mt-3 rounded-2xl bg-danger px-4 py-3 text-right text-white shadow-sm">
-          <div className="font-bold">🔔 {myAttention.length === 1 ? 'משימה אחת מחכה לאישור שלך' : `${myAttention.length} משימות מחכות לאישור שלך`}</div>
-          <div className="text-sm opacity-90">{myAttention.slice(0, 3).map(a => `${a.event.event_date === today ? 'היום' : 'מחר'}: ${a.event.title}`).join(' · ')}</div>
-        </button>
-      )}
-      {me.is_admin && teamAttention.length > 0 && (
-        <div className="mx-3 mt-3 rounded-2xl bg-warning-soft px-4 py-2 text-sm text-warning">
-          ⏳ {teamAttention.length} משימות להיום/מחר עוד לא אושרו: {[...new Set(teamAttention.map(a => a.event.title))].slice(0, 3).join(', ')}
+      {(myAttention.length > 0 || (me.is_admin && teamAttention.length > 0)) && (
+        <div className="flex flex-col gap-2 px-4 pt-4 sm:px-6">
+          {myAttention.length > 0 && (
+            <button onClick={() => setOpen({ event: myAttention[0].event, tasks: soon.tasksByEvent.get(myAttention[0].event.id) ?? [] })}
+              className="rounded-lg border-2 border-primary bg-primary-soft px-4 py-3 text-right">
+              <div className="font-bold text-primary-dark">{myAttention.length === 1 ? 'משימה אחת מחכה לאישור שלך' : `${myAttention.length} משימות מחכות לאישור שלך`}</div>
+              <div className="text-[14px]">{myAttention.slice(0, 3).map(a => `${a.event.event_date === today ? 'היום' : 'מחר'}: ${a.event.title}`).join(' · ')}</div>
+            </button>
+          )}
+          {me.is_admin && teamAttention.length > 0 && (
+            <div className="rounded-lg bg-warning-soft px-4 py-2.5 text-[14px] text-warning">
+              <b>{teamAttention.length} משימות להיום/מחר עוד לא אושרו:</b> {[...new Set(teamAttention.map(a => a.event.title))].slice(0, 4).join(', ')}
+            </div>
+          )}
         </div>
       )}
-      {board.error && <div className="mx-3 mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">שגיאה בטעינה: {board.error}</div>}
+      {board.error && <div className="mx-4 mt-3 rounded-lg bg-danger-soft p-3 text-sm text-danger">שגיאה בטעינה: {board.error}</div>}
 
-      <main className={`flex-1 pt-3 ${me.is_admin ? 'pb-24' : 'pb-6'}`}>
+      <main className={`flex-1 pt-5 ${me.is_admin ? 'pb-28' : 'pb-10'}`}>
         {board.loading && !board.events.length ? <p className="py-10 text-center text-muted">טוען…</p>
-          : view === 'month' ? <MonthView date={date} events={visible} tasksByEvent={board.tasksByEvent} onOpen={e => setOpen({ event: e, tasks: board.tasksByEvent.get(e.id) ?? [] })} onPickDay={d => { setDate(d); setView('day'); }} />
-          : view === 'week' ? <WeekView date={date} events={visible} tasksByEvent={board.tasksByEvent} onOpen={e => setOpen({ event: e, tasks: board.tasksByEvent.get(e.id) ?? [] })} />
-          : <DayView date={date} events={visible} tasksByEvent={board.tasksByEvent} onOpen={e => setOpen({ event: e, tasks: board.tasksByEvent.get(e.id) ?? [] })} />}
-        {scope === 'mine' && !visible.length && !board.loading && (
-          <p className="px-6 text-center text-sm text-muted">מציג רק אירועים שקשורים אליך. <button className="font-bold text-primary" onClick={() => setScope('all')}>להצגת הכל</button></p>
+          : view === 'month' ? <MonthView date={date} events={visible} tasksByEvent={board.tasksByEvent} changed={changed} onOpen={openEvent} onPickDay={d => { setDate(d); setView('day'); }} />
+          : view === 'week' ? <WeekView date={date} events={visible} tasksByEvent={board.tasksByEvent} changed={changed} onOpen={openEvent} />
+          : <DayView date={date} events={visible} tasksByEvent={board.tasksByEvent} changed={changed} onOpen={openEvent} />}
+        {scope !== 'all' && !visible.length && !board.loading && (
+          <p className="px-6 text-center text-sm text-muted">מסונן לפי "{chips.find(c => c.id === scope)?.label}". <button className="font-bold text-primary" onClick={() => setScope('all')}>להצגת הכל</button></p>
         )}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3 px-4 text-[14px] text-muted">
+          <button onClick={() => setPrint({ title: `${printTitle}${scopeName}`, events: visible, tasksByEvent: board.tasksByEvent })} className={ctl}>הדפסה / PDF</button>
+          {me.is_admin && <button onClick={() => setPanel('people')} className={ctl}>אנשים והרשאות</button>}
+          <button onClick={async () => { if (await ask('להתנתק מהמכשיר הזה?', { ok: 'התנתקות' })) signOut().then(() => location.reload()); }} className={ctl}>התנתקות</button>
+          <span className="md:hidden"><Legend /></span>
+        </div>
       </main>
 
       {me.is_admin && (
-        <div className="pb-safe pointer-events-none sticky bottom-0 flex justify-start px-4">
-          <Btn className="pointer-events-auto h-14 rounded-full px-6 text-base shadow-lg" onClick={() => setEditor({ draft: emptyDraft(view === 'day' ? date : today < from || today > to ? from : today) })}>+ אירוע חדש</Btn>
+        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-[1500px] justify-start px-5 pb-5">
+          <button className="pointer-events-auto h-14 rounded-full bg-control px-7 text-[16px] font-bold text-control-ink shadow-xl hover:opacity-90"
+            onClick={() => setEditor({ draft: emptyDraft(view === 'day' ? date : today < from || today > to ? from : today) })}>+ אירוע חדש</button>
         </div>
       )}
 
       {open && !editor && (
         <EventSheet event={open.event} tasks={open.tasks} onClose={() => setOpen(null)} onChanged={refreshAll}
+          onPrint={() => setPrint({ title: open.event.title, events: [open.event], tasksByEvent: new Map([[open.event.id, open.tasks]]) })}
           onEdit={() => setEditor({ draft: draftFrom(open.event, open.tasks), status: open.event.status })}
           onDuplicate={() => setEditor({ draft: { ...draftFrom(open.event, open.tasks, true), title: `${open.event.title} (עותק)` } })} />
       )}
@@ -158,6 +218,24 @@ export function Board() {
       )}
       {panel === 'inbox' && <Inbox onClose={() => { setPanel(null); refreshAll(); }} onOpenEvent={id => { setPanel(null); openById(id); }} />}
       {panel === 'people' && <People onClose={() => setPanel(null)} />}
+      {panel === 'changes' && (
+        <Sheet onClose={() => setPanel(null)} title="שינויים מאז הביקור הקודם">
+          <div className="flex flex-col gap-2 p-4">
+            {!changedList.length && <p className="py-8 text-center text-muted">אין שינויים חדשים בתקופה המוצגת</p>}
+            {changedList.sort(sortByTime).map(e => (
+              <button key={e.id} onClick={() => { setPanel(null); openEvent(e); }}
+                className="flex items-center gap-3 rounded-lg border border-line p-3 text-right hover:bg-surface-2"
+                style={{ borderInlineEndWidth: 4, borderInlineEndColor: eventColor(e) }}>
+                <span className="ltr-nums w-12 shrink-0 font-bold">{shortDate(e.event_date)}</span>
+                <span className="min-w-0 flex-1 font-semibold">{e.title}{e.status === 'cancelled' && <span className="text-danger"> · בוטל</span>}</span>
+                <span className="text-xs text-muted">עודכן {new Date(lastChange(e, board.tasksByEvent.get(e.id) ?? [])).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              </button>
+            ))}
+            {changedList.length > 0 && <button onClick={markAllSeen} className="mt-2 h-11 rounded-xl bg-control font-bold text-control-ink">סימון הכל כנקרא</button>}
+          </div>
+        </Sheet>
+      )}
+      {print && <PrintView title={print.title} events={print.events} tasksByEvent={print.tasksByEvent} onClose={() => setPrint(null)} />}
     </div>
   );
 }
